@@ -1,0 +1,948 @@
+--objetos pl sql
+
+-- Crear tabla Rubro
+CREATE TABLE Rubro(
+    ID_Rubro INT PRIMARY KEY NOT NULL,
+    Nombre VARCHAR2(255)
+);
+
+-- Crear la tabla CompraGasto con ID_Permiso y ID_Presupuesto como claves foráneas
+CREATE TABLE CompraGasto (
+    ID_CompraGasto INT PRIMARY KEY,
+    ID_Permiso INT,
+    ID_Presupuesto INT,
+    Numero_Comprobante VARCHAR2(255),
+    Monto_Real DECIMAL(10, 2),
+    Fecha DATE,
+    FOREIGN KEY (ID_Permiso) REFERENCES Permiso(ID_Permiso),
+    FOREIGN KEY (ID_Presupuesto) REFERENCES Presupuesto(ID_Presupuesto)
+);
+
+
+
+-- Crear la tabla Permiso
+CREATE TABLE Permiso (
+    ID_Permiso INT PRIMARY KEY,
+    ID_Usuario INT,
+    MontoSolicitado DECIMAL(10, 2),
+    Estado VARCHAR2(255),
+    CodigoPermiso VARCHAR2(255),
+    Fecha DATE,
+    ID_Presupuesto INT,
+    FOREIGN KEY (ID_Usuario) REFERENCES Usuario(ID_Usuario),
+    FOREIGN KEY (ID_Presupuesto) REFERENCES Presupuesto(ID_Presupuesto)
+);
+
+-- Crear la tabla Usuario
+CREATE TABLE Usuario (
+    ID_Usuario INT PRIMARY KEY,
+    Nombre VARCHAR2(255) NOT NULL,
+    Rol VARCHAR2(255) NOT NULL,
+    ID_CentroDeCosto INT NOT NULL,
+    FOREIGN KEY (ID_CentroDeCosto) REFERENCES CentroDeCosto(ID_CentroDeCosto)
+);
+-- Crear la tabla CentroDeCosto
+CREATE TABLE CentroDeCosto (
+    ID_CentroDeCosto INT PRIMARY KEY NOT NULL,
+    Nombre VARCHAR2(255) NOT NULL,
+    ID_Padre INT NOT NULL
+);
+
+-- Crear la tabla Presupuesto
+CREATE TABLE Presupuesto (
+    ID_Presupuesto INT PRIMARY KEY,
+    ID_Rubro INT,
+    Nombre VARCHAR2(255),
+    Monto DECIMAL(10, 2),
+    FechaInicio DATE,
+    FechaFin DATE,
+    Estado VARCHAR2(255),
+    FOREIGN KEY (ID_Rubro) REFERENCES Rubro(ID_Rubro)
+);
+
+
+-- Crear la tabla Modificacion
+CREATE TABLE Modificacion (
+    ID_Modificacion INT PRIMARY KEY,
+    ID_Presupuesto INT,
+    TipoModificacion VARCHAR2(50),
+    FechaModificacion DATE,
+    FOREIGN KEY (ID_Presupuesto) REFERENCES Presupuesto(ID_Presupuesto)
+);
+
+-- Crear la tabla Liquidacion
+CREATE TABLE Liquidacion (
+    ID_Liquidacion INT PRIMARY KEY NOT NULL,
+    ID_Presupuesto INT NOT NULL,
+    Monto DECIMAL(10, 2) NOT NULL,
+    Fecha DATE NOT NULL,
+    FOREIGN KEY (ID_Presupuesto) REFERENCES Presupuesto(ID_Presupuesto)
+);
+
+--procedimientos
+
+
+CREATE OR REPLACE PROCEDURE EliminarPresupuestosPorFecha (
+    p_FechaLimite IN Presupuesto.FechaInicio%TYPE
+)
+IS
+BEGIN
+    DELETE FROM Presupuesto WHERE FechaInicio < p_FechaLimite;
+    COMMIT;
+END;
+
+CREATE OR REPLACE PROCEDURE ActualizarMontoPresupuestoPorNombre (
+    p_Nombre IN Presupuesto.Nombre%TYPE,
+    p_NuevoMonto IN Presupuesto.Monto%TYPE
+)
+IS
+BEGIN
+    UPDATE Presupuesto
+    SET Monto = p_NuevoMonto
+    WHERE Nombre = p_Nombre;
+    COMMIT;
+END;
+
+
+CREATE OR REPLACE PROCEDURE MostrarPresupuestoPorID (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+IS
+BEGIN
+    FOR pres IN (SELECT * FROM Presupuesto WHERE ID_Presupuesto = p_ID_Presupuesto) LOOP
+        DBMS_OUTPUT.PUT_LINE('ID: ' || pres.ID_Presupuesto || ', Nombre: ' || pres.Nombre || ', Monto: ' || pres.Monto || ', Fecha Inicio: ' || pres.FechaInicio || ', Fecha Fin: ' || pres.FechaFin);
+    END LOOP;
+END;
+
+CREATE OR REPLACE PROCEDURE EliminarModificacionesPorPresupuesto (
+    p_ID_Presupuesto IN Modificacion.ID_Presupuesto%TYPE
+)
+IS
+BEGIN
+    DELETE FROM Modificacion WHERE ID_Presupuesto = p_ID_Presupuesto;
+    COMMIT;
+END;
+
+CREATE OR REPLACE PROCEDURE ActualizarFechaInicioFin (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE,
+    p_NuevaFechaInicio IN Presupuesto.FechaInicio%TYPE,
+    p_NuevaFechaFin IN Presupuesto.FechaFin%TYPE
+)
+IS
+BEGIN
+    UPDATE Presupuesto
+    SET FechaInicio = p_NuevaFechaInicio, FechaFin = p_NuevaFechaFin
+    WHERE ID_Presupuesto = p_ID_Presupuesto;
+END;
+
+CREATE OR REPLACE PROCEDURE CambiarFechaFinPorNombre (
+    p_Nombre IN Presupuesto.Nombre%TYPE,
+    p_NuevaFechaFin IN Presupuesto.FechaFin%TYPE
+)
+IS
+BEGIN
+    UPDATE Presupuesto
+    SET FechaFin = p_NuevaFechaFin
+    WHERE Nombre = p_Nombre;
+    COMMIT;
+END;
+
+CREATE OR REPLACE PROCEDURE EliminarPresupuestosPorMonto (
+    p_MontoLimite IN Presupuesto.Monto%TYPE
+)
+IS
+BEGIN
+    DELETE FROM Presupuesto WHERE Monto > p_MontoLimite;
+    COMMIT;
+END;
+
+CREATE OR REPLACE PROCEDURE MostrarModificacionesPorTipo (
+    p_TipoModificacion IN Modificacion.TipoModificacion%TYPE
+)
+IS
+BEGIN
+    FOR modif IN (SELECT * FROM Modificacion WHERE TipoModificacion = p_TipoModificacion) LOOP
+        DBMS_OUTPUT.PUT_LINE('ID Modificación: ' || modif.ID_Modificacion || ', Tipo: ' || modif.TipoModificacion || ', Fecha: ' || modif.FechaModificacion);
+    END LOOP;
+END;
+
+CREATE OR REPLACE PROCEDURE CopiarPresupuestoConModificaciones (
+    p_ID_PresupuestoOrigen IN Presupuesto.ID_Presupuesto%TYPE,
+    p_ID_PresupuestoDestino IN Presupuesto.ID_Presupuesto%TYPE
+)
+IS
+BEGIN
+    INSERT INTO Presupuesto (ID_Presupuesto, Nombre, Monto, FechaInicio, FechaFin)
+    SELECT p_ID_PresupuestoDestino, Nombre, Monto, FechaInicio, FechaFin
+    FROM Presupuesto WHERE ID_Presupuesto = p_ID_PresupuestoOrigen;
+    
+    INSERT INTO Modificacion (ID_Modificacion, ID_Presupuesto, TipoModificacion, FechaModificacion)
+    SELECT Modificacion_SEQ.NEXTVAL, p_ID_PresupuestoDestino, TipoModificacion, FechaModificacion
+    FROM Modificacion WHERE ID_Presupuesto = p_ID_PresupuestoOrigen;
+    
+    COMMIT;
+END;
+
+CREATE OR REPLACE PROCEDURE EliminarModificacionesAnterioresA (
+    p_FechaLimite IN Modificacion.FechaModificacion%TYPE
+)
+IS
+BEGIN
+    DELETE FROM Modificacion WHERE FechaModificacion < p_FechaLimite;
+    COMMIT;
+END;
+
+CREATE OR REPLACE PROCEDURE CambiarNombrePresupuestoConID (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE,
+    p_NuevoNombre IN Presupuesto.Nombre%TYPE
+)
+IS
+BEGIN
+    UPDATE Presupuesto
+    SET Nombre = p_NuevoNombre
+    WHERE ID_Presupuesto = p_ID_Presupuesto;
+    COMMIT;
+END;
+
+CREATE OR REPLACE PROCEDURE ActualizarNombreYFecha (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE,
+    p_NuevoNombre IN Presupuesto.Nombre%TYPE,
+    p_NuevaFechaFin IN Presupuesto.FechaFin%TYPE
+)
+IS
+BEGIN
+    UPDATE Presupuesto
+    SET Nombre = p_NuevoNombre, FechaFin = p_NuevaFechaFin
+    WHERE ID_Presupuesto = p_ID_Presupuesto;
+    
+    INSERT INTO Modificacion (ID_Modificacion, ID_Presupuesto, TipoModificacion, FechaModificacion)
+    VALUES (Modificacion_SEQ.NEXTVAL, p_ID_Presupuesto, 'Actualización de Nombre y Fecha Fin', SYSDATE);
+    COMMIT;
+END;
+
+
+
+--vistas
+
+
+CREATE OR REPLACE VIEW VistaPresupuestosActivos AS
+SELECT * FROM Presupuesto WHERE FechaFin > SYSDATE;
+
+CREATE OR REPLACE VIEW VistaPresupuestosPorMonto AS
+SELECT ID_Presupuesto, Nombre, Monto FROM Presupuesto ORDER BY Monto DESC;
+
+CREATE OR REPLACE VIEW VistaModificacionesRecientes AS
+SELECT * FROM Modificacion WHERE FechaModificacion >= SYSDATE - 7;
+
+CREATE OR REPLACE VIEW VistaPresupuestosModificados AS
+SELECT p.ID_Presupuesto, p.Nombre, p.Monto, m.TipoModificacion, m.FechaModificacion
+FROM Presupuesto p
+JOIN Modificacion m ON p.ID_Presupuesto = m.ID_Presupuesto;
+
+CREATE OR REPLACE VIEW VistaPresupuestosPorFecha AS
+SELECT ID_Presupuesto, Nombre, FechaInicio, FechaFin 
+FROM Presupuesto 
+ORDER BY FechaInicio DESC;
+
+
+
+--funciones
+
+-- para obtener el monto de liquidación por presupuesto
+
+CREATE OR REPLACE FUNCTION ObtenerMontoLiquidacionPorPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN Liquidacion.Monto%TYPE
+IS
+    monto_total Liquidacion.Monto%TYPE := 0;
+BEGIN
+    SELECT SUM(Monto) INTO monto_total FROM Liquidacion WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN monto_total;
+END;
+
+-- función para obtener saldo por presupuesto
+
+CREATE OR REPLACE FUNCTION ObtenerSaldoPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN NUMBER
+IS
+    monto_total Presupuesto.Monto%TYPE;
+    monto_gastado Liquidacion.Monto%TYPE;
+    saldo_restante NUMBER;
+BEGIN
+    SELECT Monto INTO monto_total FROM Presupuesto WHERE ID_Presupuesto = p_ID_Presupuesto;
+    SELECT NVL(SUM(Monto), 0) INTO monto_gastado FROM Liquidacion WHERE ID_Presupuesto = p_ID_Presupuesto;
+    
+    saldo_restante := monto_total - monto_gastado;
+    RETURN saldo_restante;
+END;
+
+
+
+--obtener total de compras, gastos por presupuesto
+
+CREATE OR REPLACE FUNCTION ObtenerTotalComprasGastosPorPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN CompraGasto.Monto_Real%TYPE
+IS
+    total_gastado CompraGasto.Monto_Real%TYPE := 0;
+BEGIN
+    SELECT NVL(SUM(Monto_Real), 0) INTO total_gastado FROM CompraGasto WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN total_gastado;
+END;
+
+-- obtener numero de rubro por presupuesto
+CREATE OR REPLACE FUNCTION ObtenerNombreRubroPorPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN Rubro.Nombre%TYPE
+IS
+    nombre_rubro Rubro.Nombre%TYPE;
+BEGIN
+    SELECT r.Nombre INTO nombre_rubro
+    FROM Presupuesto p
+    JOIN Rubro r ON p.ID_RUBRO = r.ID_RUBRO
+    WHERE p.ID_Presupuesto = p_ID_Presupuesto;
+    
+    RETURN nombre_rubro;
+END;
+
+
+--obtener estado por presupuesto
+
+CREATE OR REPLACE FUNCTION ObtenerEstadoPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN Presupuesto.Estado%TYPE
+IS
+    estado_presupuesto Presupuesto.Estado%TYPE;
+BEGIN
+    SELECT Estado INTO estado_presupuesto FROM Presupuesto WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN estado_presupuesto;
+END;
+
+--Obtener la cantidad de liquidaciones realizadas para un presupuesto
+
+CREATE OR REPLACE FUNCTION ContarLiquidacionesPorPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN INTEGER
+IS
+    cantidad_liquidaciones INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO cantidad_liquidaciones FROM Liquidacion WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN cantidad_liquidaciones;
+END;
+
+-- Calcular el promedio de modificaciones realizadas por presupuesto
+
+CREATE OR REPLACE FUNCTION CalcularPromedioModificacionesPorPresupuesto
+RETURN NUMBER
+IS
+    total_presupuestos INTEGER;
+    total_modificaciones INTEGER;
+    promedio NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO total_presupuestos FROM Presupuesto;
+    SELECT COUNT(*) INTO total_modificaciones FROM Modificacion;
+    
+    IF total_presupuestos = 0 THEN
+        RETURN 0; -- Para evitar división por cero
+    ELSE
+        promedio := total_modificaciones / total_presupuestos;
+        RETURN promedio;
+    END IF;
+END;
+
+--Obtener el ID del presupuesto más reciente según la fecha de inicio
+
+CREATE OR REPLACE FUNCTION ObtenerIDPresupuestoMasReciente
+RETURN Presupuesto.ID_Presupuesto%TYPE
+IS
+    id_presupuesto Presupuesto.ID_Presupuesto%TYPE;
+BEGIN
+    SELECT ID_Presupuesto INTO id_presupuesto
+    FROM Presupuesto
+    WHERE FechaInicio = (SELECT MAX(FechaInicio) FROM Presupuesto);
+    
+    RETURN id_presupuesto;
+END;
+
+
+CREATE OR REPLACE FUNCTION ObtenerMontoPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN Presupuesto.Monto%TYPE
+IS
+    monto Presupuesto.Monto%TYPE;
+BEGIN
+    SELECT Monto INTO monto FROM Presupuesto WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN monto;
+END;
+
+CREATE OR REPLACE FUNCTION ContarModificacionesPorTipo (
+    p_TipoModificacion IN Modificacion.TipoModificacion%TYPE
+)
+RETURN INTEGER
+IS
+    cantidad INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO cantidad FROM Modificacion WHERE TipoModificacion = p_TipoModificacion;
+    RETURN cantidad;
+END;
+
+CREATE OR REPLACE FUNCTION ObtenerNombrePresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN Presupuesto.Nombre%TYPE
+IS
+    nombre Presupuesto.Nombre%TYPE;
+BEGIN
+    SELECT Nombre INTO nombre FROM Presupuesto WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN nombre;
+END;
+
+CREATE OR REPLACE FUNCTION ObtenerFechaFinPresupuesto (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN Presupuesto.FechaFin%TYPE
+IS
+    fecha_fin Presupuesto.FechaFin%TYPE;
+BEGIN
+    SELECT FechaFin INTO fecha_fin FROM Presupuesto WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN fecha_fin;
+END;
+
+CREATE OR REPLACE FUNCTION CalcularDiasRestantes (
+    p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+)
+RETURN NUMBER
+IS
+    dias_restantes NUMBER;
+BEGIN
+    SELECT ROUND(FechaFin - SYSDATE) INTO dias_restantes FROM Presupuesto WHERE ID_Presupuesto = p_ID_Presupuesto;
+    RETURN dias_restantes;
+END;
+CREATE OR REPLACE FUNCTION CalcularTotalModificaciones()
+RETURN INTEGER
+IS
+    total_modificaciones INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO total_modificaciones FROM Modificacion;
+    RETURN total_modificaciones;
+END;
+
+CREATE OR REPLACE FUNCTION ObtenerIDUltimaModificacion()
+RETURN Modificacion.ID_Modificacion%TYPE
+IS
+    ultima_modificacion Modificacion.ID_Modificacion%TYPE;
+BEGIN
+    SELECT ID_Modificacion INTO ultima_modificacion FROM Modificacion WHERE ROWNUM = 1 ORDER BY ID_Modificacion DESC;
+    RETURN ultima_modificacion;
+END;
+
+CREATE OR REPLACE FUNCTION ObtenerTotalComprasGastosPorUsuario(
+    p_ID_Usuario IN Usuario.ID_Usuario%TYPE
+)
+RETURN NUMBER
+IS
+    total_compras_gastos CompraGasto.Monto_Real%TYPE := 0;
+BEGIN
+    SELECT NVL(SUM(CG.Monto_Real), 0)
+    INTO total_compras_gastos
+    FROM CompraGasto CG
+    JOIN Permiso P ON CG.ID_Permiso = P.ID_Permiso
+    WHERE P.ID_Usuario = p_ID_Usuario;
+
+    RETURN total_compras_gastos;
+END;
+
+
+
+--cursores
+
+DECLARE
+    CURSOR presupuesto_por_nombre_cursor IS SELECT * FROM Presupuesto WHERE Nombre = 'NombreEspecifico';
+    CURSOR presupuesto_por_monto_cursor IS SELECT * FROM Presupuesto WHERE Monto > 1000;
+    CURSOR presupuesto_por_fecha_cursor IS SELECT * FROM Presupuesto WHERE FechaFin > SYSDATE;
+    CURSOR modificaciones_por_tipo_cursor IS SELECT * FROM Modificacion WHERE TipoModificacion = 'TipoEspecifico';
+    CURSOR presupuesto_modificaciones_cursor IS SELECT p.ID_Presupuesto, p.Nombre, COUNT(m.ID_Modificacion) AS NumModificaciones
+        FROM Presupuesto p
+        LEFT JOIN Modificacion m ON p.ID_Presupuesto = m.ID_Presupuesto
+        GROUP BY p.ID_Presupuesto, p.Nombre;
+    CURSOR ultima_modificacion_cursor IS SELECT * FROM Modificacion WHERE ID_Modificacion = (SELECT MAX(ID_Modificacion) FROM Modificacion);
+    CURSOR presupuestos_vencidos_cursor IS SELECT * FROM Presupuesto WHERE FechaFin < SYSDATE;
+    
+    -- Agrega acciones para manipular o procesar los datos obtenidos por los cursores anteriores.
+    
+    -- Ejemplo de uso de un cursor para mostrar información de presupuestos por nombre.
+    v_id_presupuesto Presupuesto.ID_Presupuesto%TYPE;
+    v_nombre_presupuesto Presupuesto.Nombre%TYPE;
+    v_monto_presupuesto Presupuesto.Monto%TYPE;
+BEGIN
+    OPEN presupuesto_por_nombre_cursor;
+    LOOP
+        FETCH presupuesto_por_nombre_cursor INTO v_id_presupuesto, v_nombre_presupuesto, v_monto_presupuesto;
+        EXIT WHEN presupuesto_por_nombre_cursor%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('ID: ' || v_id_presupuesto || ', Nombre: ' || v_nombre_presupuesto || ', Monto: ' || v_monto_presupuesto);
+    END LOOP;
+    CLOSE presupuesto_por_nombre_cursor;
+    
+    -- Agrega más bloques similares para realizar operaciones o mostrar información con los otros cursores.
+END;
+
+
+-- triggers
+
+--Trigger 1: Ejecución al Actualizar Monto del Presupuesto
+
+CREATE OR REPLACE TRIGGER ActualizarEstadoPresupuesto
+AFTER UPDATE OF Monto ON Presupuesto
+FOR EACH ROW
+BEGIN
+    IF :OLD.Monto != :NEW.Monto THEN
+        UPDATE Presupuesto
+        SET Estado = 'Actualizado'
+        WHERE ID_Presupuesto = :NEW.ID_Presupuesto;
+    END IF;
+END;
+/
+
+--Trigger 2: Verificar Presupuesto al Insertar Liquidación
+
+CREATE OR REPLACE TRIGGER VerificarExcesoPresupuesto
+BEFORE INSERT ON Liquidacion
+FOR EACH ROW
+DECLARE
+    monto_presupuesto Presupuesto.Monto%TYPE;
+BEGIN
+    SELECT Monto INTO monto_presupuesto FROM Presupuesto WHERE ID_Presupuesto = :NEW.ID_Presupuesto;
+    
+    IF :NEW.Monto > monto_presupuesto THEN
+        UPDATE Presupuesto
+        SET Estado = 'Excedido'
+        WHERE ID_Presupuesto = :NEW.ID_Presupuesto;
+    END IF;
+END;
+/
+
+--Trigger 3: Actualizar Fecha Fin del Presupuesto
+
+CREATE OR REPLACE TRIGGER ActualizarFechaFinPresupuesto
+AFTER INSERT ON Modificacion
+FOR EACH ROW
+BEGIN
+    IF :NEW.TipoModificacion IN ('Actualización de Nombre y Fecha Fin') THEN
+        UPDATE Presupuesto
+        SET FechaFin = :NEW.FechaModificacion
+        WHERE ID_Presupuesto = :NEW.ID_Presupuesto;
+    END IF;
+END;
+/
+
+Trigger 4: Mantener Registro de Cambios en Presupuestos
+
+CREATE OR REPLACE TRIGGER RegistroCambiosPresupuesto
+AFTER INSERT ON Modificacion
+FOR EACH ROW
+BEGIN
+    INSERT INTO HistorialCambiosPresupuesto(ID_Presupuesto, TipoModificacion, FechaModificacion)
+    VALUES (:NEW.ID_Presupuesto, :NEW.TipoModificacion, :NEW.FechaModificacion);
+END;
+/
+
+Trigger 5: Verificar Estado del Presupuesto
+
+CREATE OR REPLACE TRIGGER VerificarPresupuestoVencido
+BEFORE INSERT OR UPDATE ON Presupuesto
+FOR EACH ROW
+BEGIN
+    IF :NEW.FechaFin < SYSDATE THEN
+        UPDATE Presupuesto
+        SET Estado = 'Vencido'
+        WHERE ID_Presupuesto = :NEW.ID_Presupuesto;
+    END IF;
+END;
+/
+
+--paquetes
+
+
+--1-Paquete gestor de presupuesto
+
+CREATE OR REPLACE PACKAGE GestorPresupuestos AS
+
+    -- Funciones para obtener información relacionada con presupuestos
+
+    FUNCTION ObtenerMontoLiquidacionPorPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN Liquidacion.Monto%TYPE;
+
+    FUNCTION ObtenerSaldoPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN NUMBER;
+
+    FUNCTION ObtenerTotalComprasGastosPorPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN CompraGasto.Monto_Real%TYPE;
+
+    FUNCTION ObtenerNombreRubroPorPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN Rubro.Nombre%TYPE;
+
+    FUNCTION ObtenerEstadoPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN Presupuesto.Estado%TYPE;
+
+    FUNCTION ContarLiquidacionesPorPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN INTEGER;
+
+    FUNCTION CalcularPromedioModificacionesPorPresupuesto RETURN NUMBER;
+
+    FUNCTION ObtenerIDPresupuestoMasReciente RETURN Presupuesto.ID_Presupuesto%TYPE;
+
+    FUNCTION ObtenerMontoPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN Presupuesto.Monto%TYPE;
+
+    FUNCTION ContarModificacionesPorTipo (
+        p_TipoModificacion IN Modificacion.TipoModificacion%TYPE
+    ) RETURN INTEGER;
+
+    FUNCTION ObtenerNombrePresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN Presupuesto.Nombre%TYPE;
+
+    FUNCTION ObtenerFechaFinPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN Presupuesto.FechaFin%TYPE;
+
+    FUNCTION CalcularDiasRestantes (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN NUMBER;
+
+    FUNCTION CalcularTotalModificaciones RETURN INTEGER;
+
+    FUNCTION ObtenerIDUltimaModificacion RETURN Modificacion.ID_Modificacion%TYPE;
+
+    FUNCTION ObtenerTotalComprasGastosPorUsuario(
+        p_ID_Usuario IN Usuario.ID_Usuario%TYPE
+    ) RETURN NUMBER;
+
+END GestorPresupuestos;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorPresupuestos AS
+
+    -- Implementación de las funciones del paquete
+
+    FUNCTION ObtenerMontoLiquidacionPorPresupuesto (
+        p_ID_Presupuesto IN Presupuesto.ID_Presupuesto%TYPE
+    ) RETURN Liquidacion.Monto%TYPE IS
+    ...
+
+    -- Implementación de las demás funciones
+
+    FUNCTION ObtenerTotalComprasGastosPorUsuario(
+        p_ID_Usuario IN Usuario.ID_Usuario%TYPE
+    ) RETURN NUMBER IS
+    BEGIN
+        DECLARE
+            total_compras_gastos CompraGasto.Monto_Real%TYPE := 0;
+        BEGIN
+            SELECT NVL(SUM(CG.Monto_Real), 0)
+            INTO total_compras_gastos
+            FROM CompraGasto CG
+            JOIN Permiso P ON CG.ID_Permiso = P.ID_Permiso
+            WHERE P.ID_Usuario = p_ID_Usuario;
+
+            RETURN total_compras_gastos;
+        END;
+    END;
+
+END GestorPresupuestos;
+/
+
+
+--2 paquete
+
+CREATE OR REPLACE PACKAGE GestorPresupuestos AS
+
+    -- ... (otras funciones)
+
+    FUNCTION ContarPresupuestosPorEstado(
+        p_Estado IN Presupuesto.Estado%TYPE
+    ) RETURN INTEGER;
+
+    -- ... (otras funciones)
+
+END GestorPresupuestos;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorPresupuestos AS
+
+    -- ... (implementación de otras funciones)
+
+    FUNCTION ContarPresupuestosPorEstado(
+        p_Estado IN Presupuesto.Estado%TYPE
+    ) RETURN INTEGER IS
+        cantidad_presupuestos INTEGER;
+    BEGIN
+        SELECT COUNT(*)
+        INTO cantidad_presupuestos
+        FROM Presupuesto
+        WHERE Estado = p_Estado;
+
+        RETURN cantidad_presupuestos;
+    END ContarPresupuestosPorEstado;
+
+    -- ... (implementación de otras funciones)
+
+END GestorPresupuestos;
+/
+
+
+--3 paquete 
+
+CREATE OR REPLACE PACKAGE GestorPresupuestos AS
+
+    -- ... (otras funciones)
+
+    FUNCTION ContarPresupuestosPorEstado(
+        p_Estado IN Presupuesto.Estado%TYPE
+    ) RETURN INTEGER;
+
+    -- ... (otras funciones)
+
+END GestorPresupuestos;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorPresupuestos AS
+
+    -- ... (implementación de otras funciones)
+
+    FUNCTION ContarPresupuestosPorEstado(
+        p_Estado IN Presupuesto.Estado%TYPE
+    ) RETURN INTEGER IS
+        cantidad_presupuestos INTEGER;
+    BEGIN
+        SELECT COUNT(*)
+        INTO cantidad_presupuestos
+        FROM Presupuesto
+        WHERE Estado = p_Estado;
+
+        RETURN cantidad_presupuestos;
+    END ContarPresupuestosPorEstado;
+
+    -- ... (implementación de otras funciones)
+
+END GestorPresupuestos;
+/
+
+--4 paquete
+
+CREATE OR REPLACE PACKAGE GestorUsuarios AS
+
+    FUNCTION ObtenerRolUsuario(
+        p_ID_Usuario IN Usuario.ID_Usuario%TYPE
+    ) RETURN Usuario.Rol%TYPE;
+
+END GestorUsuarios;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorUsuarios AS
+
+    FUNCTION ObtenerRolUsuario(
+        p_ID_Usuario IN Usuario.ID_Usuario%TYPE
+    ) RETURN Usuario.Rol%TYPE IS
+        rol_usuario Usuario.Rol%TYPE;
+    BEGIN
+        SELECT Rol
+        INTO rol_usuario
+        FROM Usuario
+        WHERE ID_Usuario = p_ID_Usuario;
+
+        RETURN rol_usuario;
+    END ObtenerRolUsuario;
+
+END GestorUsuarios;
+/
+
+--paquete 5
+
+CREATE OR REPLACE PACKAGE GestorCentrosCosto AS
+
+    FUNCTION ObtenerNombreCentroCosto(
+        p_ID_CentroDeCosto IN CentroDeCosto.ID_CentroDeCosto%TYPE
+    ) RETURN CentroDeCosto.Nombre%TYPE;
+
+END GestorCentrosCosto;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorCentrosCosto AS
+
+    FUNCTION ObtenerNombreCentroCosto(
+        p_ID_CentroDeCosto IN CentroDeCosto.ID_CentroDeCosto%TYPE
+    ) RETURN CentroDeCosto.Nombre%TYPE IS
+        nombre_cc CentroDeCosto.Nombre%TYPE;
+    BEGIN
+        SELECT Nombre
+        INTO nombre_cc
+        FROM CentroDeCosto
+        WHERE ID_CentroDeCosto = p_ID_CentroDeCosto;
+
+        RETURN nombre_cc;
+    END ObtenerNombreCentroCosto;
+
+END GestorCentrosCosto;
+/
+
+--paquete 6 : Gestión de Centros de Costo
+
+CREATE OR REPLACE PACKAGE GestorCentrosCosto AS
+
+    FUNCTION ObtenerNombreCentroCosto(
+        p_ID_CentroDeCosto IN CentroDeCosto.ID_CentroDeCosto%TYPE
+    ) RETURN CentroDeCosto.Nombre%TYPE;
+
+END GestorCentrosCosto;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorCentrosCosto AS
+
+    FUNCTION ObtenerNombreCentroCosto(
+        p_ID_CentroDeCosto IN CentroDeCosto.ID_CentroDeCosto%TYPE
+    ) RETURN CentroDeCosto.Nombre%TYPE IS
+        nombre_cc CentroDeCosto.Nombre%TYPE;
+    BEGIN
+        SELECT Nombre
+        INTO nombre_cc
+        FROM CentroDeCosto
+        WHERE ID_CentroDeCosto = p_ID_CentroDeCosto;
+
+        RETURN nombre_cc;
+    END ObtenerNombreCentroCosto;
+
+END GestorCentrosCosto;
+/
+
+
+
+--paquete 7 Gestión de Rubros
+
+CREATE OR REPLACE PACKAGE GestorRubros AS
+
+    FUNCTION ObtenerNombreRubro(
+        p_ID_Rubro IN Rubro.ID_Rubro%TYPE
+    ) RETURN Rubro.Nombre%TYPE;
+
+END GestorRubros;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorRubros AS
+
+    FUNCTION ObtenerNombreRubro(
+        p_ID_Rubro IN Rubro.ID_Rubro%TYPE
+    ) RETURN Rubro.Nombre%TYPE IS
+        nombre_rubro Rubro.Nombre%TYPE;
+    BEGIN
+        SELECT Nombre
+        INTO nombre_rubro
+        FROM Rubro
+        WHERE ID_Rubro = p_ID_Rubro;
+
+        RETURN nombre_rubro;
+    END ObtenerNombreRubro;
+
+END GestorRubros;
+/
+
+
+--paquete 8 Gestión de Comprobantes
+
+CREATE OR REPLACE PACKAGE GestorComprobantes AS
+
+    FUNCTION ObtenerNumeroComprobante(
+        p_ID_Comprobante IN Comprobante.ID_Comprobante%TYPE
+    ) RETURN Comprobante.Numero_Comprobante%TYPE;
+
+END GestorComprobantes;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorComprobantes AS
+
+    FUNCTION ObtenerNumeroComprobante(
+        p_ID_Comprobante IN Comprobante.ID_Comprobante%TYPE
+    ) RETURN Comprobante.Numero_Comprobante%TYPE IS
+        numero_comprobante Comprobante.Numero_Comprobante%TYPE;
+    BEGIN
+        SELECT Numero_Comprobante
+        INTO numero_comprobante
+        FROM Comprobante
+        WHERE ID_Comprobante = p_ID_Comprobante;
+
+        RETURN numero_comprobante;
+    END ObtenerNumeroComprobante;
+
+END GestorComprobantes;
+/
+
+--paquete 9 Gestión de Fechas
+CREATE OR REPLACE PACKAGE GestorFechas AS
+
+    FUNCTION CalcularDiasEntreFechas(
+        p_FechaInicio IN DATE,
+        p_FechaFin IN DATE
+    ) RETURN NUMBER;
+
+END GestorFechas;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorFechas AS
+
+    FUNCTION CalcularDiasEntreFechas(
+        p_FechaInicio IN DATE,
+        p_FechaFin IN DATE
+    ) RETURN NUMBER IS
+        dias NUMBER;
+    BEGIN
+        dias := p_FechaFin - p_FechaInicio;
+
+        RETURN dias;
+    END CalcularDiasEntreFechas;
+
+END GestorFechas;
+/
+
+--paquete 10 Gestión de Montos por Usuario
+
+CREATE OR REPLACE PACKAGE GestorMontos AS
+
+    FUNCTION ObtenerMontoTotalUsuario(
+        p_ID_Usuario IN Usuario.ID_Usuario%TYPE
+    ) RETURN NUMBER;
+
+END GestorMontos;
+/
+
+CREATE OR REPLACE PACKAGE BODY GestorMontos AS
+
+    FUNCTION ObtenerMontoTotalUsuario(
+        p_ID_Usuario IN Usuario.ID_Usuario%TYPE
+    ) RETURN NUMBER IS
+        monto_total NUMBER;
+    BEGIN
+        SELECT SUM(Monto)
+        INTO monto_total
+        FROM Presupuesto
+        WHERE ID_Usuario = p_ID_Usuario;
+
+        RETURN monto_total;
+    END ObtenerMontoTotalUsuario;
+
+END GestorMontos;
+/

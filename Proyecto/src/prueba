@@ -1,0 +1,5 @@
+from model.conexion_ora import CRUD_Rubro as crud_rubro
+numero=24
+nombre='pepito'
+
+crud_rubro.Create_Rubro(24,nombre)
